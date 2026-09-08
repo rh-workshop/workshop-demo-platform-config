@@ -165,7 +165,7 @@ spec:
           - {name: image, type: string, description: Imagen de runtime que ejecutará las pruebas}
         steps:
           - name: resolve
-            image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+            image: registry.access.redhat.com/ubi9/ubi-minimal:9.6
             script: |
               #!/usr/bin/env bash
               set -euo pipefail

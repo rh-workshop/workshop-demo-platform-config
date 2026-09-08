@@ -58,6 +58,7 @@ spec:
       workingDir: $(workspaces.source.path)/$(params.context)
       securityContext:
         allowPrivilegeEscalation: false
+        runAsNonRoot: true
         capabilities: {drop: [ALL]}
       env:
         # HOME y caché de NuGet en el filesystem efímero: el pod corre con UID aleatorio de OpenShift y no puede escribir en el HOME de la imagen.
@@ -87,10 +88,12 @@ spec:
         echo "Proyectos de prueba encontrados:" && echo "${PROYECTOS}"
 
         # La cobertura solo si el proyecto ya trae el colector coverlet (plantilla
-        # xunit estándar); no se instala nada en tiempo de CI.
-        ARGS=""
+        # xunit estándar); no se instala nada en tiempo de CI. El flag va en un ARRAY:
+        # "XPlat Code Coverage" lleva un espacio y como string entrecomillado dotnet lo
+        # recibiría como un único argumento roto; el array preserva --collect y su valor.
+        COVERAGE_ARGS=()
         if grep -rq --include='*.csproj' --include='*.fsproj' 'coverlet.collector' .; then
-          ARGS='--collect:XPlat Code Coverage'
+          COVERAGE_ARGS=(--collect:"XPlat Code Coverage" --results-directory /tmp/TestResults)
         else
           echo "AVISO: sin coverlet.collector en los proyectos; se ejecuta sin cobertura."
         fi
@@ -98,11 +101,7 @@ spec:
         # Un test en rojo corta el pipeline SIEMPRE: aquí no hay modo "informar".
         for PROYECTO in ${PROYECTOS}; do
           echo "== dotnet test ${PROYECTO}"
-          if [ -n "${ARGS}" ]; then
-            dotnet test "${PROYECTO}" --results-directory /tmp/TestResults "${ARGS}"
-          else
-            dotnet test "${PROYECTO}"
-          fi
+          dotnet test "${PROYECTO}" "${COVERAGE_ARGS[@]}"
         done
 
         # El colector deja un cobertura.xml (formato Cobertura) con line-rate en [0,1].

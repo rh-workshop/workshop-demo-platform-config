@@ -53,6 +53,7 @@ spec:
       workingDir: $(workspaces.source.path)
       securityContext:
         allowPrivilegeEscalation: false
+        runAsNonRoot: true
         capabilities: {drop: [ALL]}
       script: |
         #!/usr/bin/env sh
@@ -68,14 +69,17 @@ spec:
           --json --output=/tmp/semgrep.json \
           --error --quiet || SALIDA=$?
 
-        # El recuento sale del JSON: es el dato que se publica como result.
-        HALLAZGOS=$(grep -o '"check_id"' /tmp/semgrep.json 2>/dev/null | wc -l | tr -d ' ')
+        # El recuento sale del JSON con un parser real (python trae la imagen de
+        # semgrep): grep '"check_id"' contaba texto y mentia si el JSON cambiaba de forma.
+        HALLAZGOS=$(python3 -c 'import json,sys; print(len(json.load(open("/tmp/semgrep.json")).get("results",[])))' 2>/dev/null || echo 0)
         printf '%s' "${HALLAZGOS}" > $(results.findings.path)
         echo "Hallazgos (severidad $(params.severity)): ${HALLAZGOS}"
 
         if [ "${HALLAZGOS}" -gt 0 ]; then
+          # El detalle sale del MISMO semgrep.json ya generado: no se re-escanea (coste doble)
+          # ni se usa otro ruleset que el del conteo (antes p/security-audit divergia del total).
           echo "--- detalle ---"
-          semgrep scan --config=p/security-audit --severity=$(params.severity) --quiet || true
+          python3 -c 'import json; [print(f"{r[\"check_id\"]}  {r[\"path\"]}:{r[\"start\"][\"line\"]}") for r in json.load(open("/tmp/semgrep.json")).get("results",[])[:40]]' 2>/dev/null || true
           if [ "$(params.fail-on-violation)" = "true" ]; then
             echo "FALLA: hay hallazgos y fail-on-violation=true."
             exit 1
