@@ -30,7 +30,6 @@ spec:
     - sectionName: Regla principal
       policyGroups:
         # "Allow Privilege Escalation" es criterio de comparacion; value "true" detecta la escalada permitida.
-        # VERIFICAR fieldName/valor contra la consola ACS 4.11 (Policy Management > Allow Privilege Escalation).
         - fieldName: Allow Privilege Escalation
           values:
             - value: "true"

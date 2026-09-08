@@ -30,8 +30,10 @@ spec:
   policySections:
     - sectionName: Herramientas de descarga en la imagen
       policyGroups:
+        # "Image Component" exige el formato nombre=version (regex ^[^=]+=.*$):
+        # el "=" final matchea cualquier version del componente.
         - fieldName: Image Component
           booleanOperator: OR
           values:
-            - value: "curl"
-            - value: "wget"
+            - value: "curl="
+            - value: "wget="

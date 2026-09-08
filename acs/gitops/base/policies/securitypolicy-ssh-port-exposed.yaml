@@ -24,8 +24,10 @@ spec:
   categories:
     - Security Best Practices
     - Docker CIS
+  # Solo DEPLOY: el criterio "Exposed Port" no existe en BUILD (no hay contexto de
+  # puertos del pod en tiempo de construccion) — Central rechaza la politica si se
+  # declara en BUILD.
   lifecycleStages:
-    - BUILD
     - DEPLOY
   # enforcementActions vacio a proposito: modo INFORM. Para enforce agregar FAIL_DEPLOYMENT_CREATE/UPDATE_ENFORCEMENT.
   enforcementActions: []

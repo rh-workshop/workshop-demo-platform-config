@@ -30,9 +30,10 @@ spec:
   policySections:
     - sectionName: Regla principal
       policyGroups:
-        # "Drop Capabilities" es criterio de comparacion (sin booleanOperator); negate=true dispara cuando NO se dropea ALL.
-        # VERIFICAR fieldName/valor contra la consola ACS 4.11 (Policy Management > Drop Capabilities): confirmar semantica de negate con value ALL.
+        # Patron de la built-in "Drop All Capabilities" de 4.11: value ALL, op OR,
+        # negate false. El propio criterio dispara cuando el contenedor NO dropea ALL
+        # (no se usa negate; asi lo modela ACS).
         - fieldName: Drop Capabilities
-          negate: true
+          booleanOperator: OR
           values:
             - value: ALL

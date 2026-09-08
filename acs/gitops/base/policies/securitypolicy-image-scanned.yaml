@@ -29,8 +29,8 @@ spec:
   policySections:
     - sectionName: Regla principal
       policyGroups:
-        # "Image Scan Age" es criterio de comparacion; el value es la antiguedad maxima tolerada en dias (aqui 30).
-        # VERIFICAR fieldName/valor contra la consola ACS 4.11 (Policy Management > Image Scan Age): confirmar nombre y unidad del value (dias).
+        # "Image Scan Age": antiguedad maxima del escaneo en dias. value "30" es el
+        # de la built-in "30-Day Scan Age" de 4.11 — verificado contra la consola.
         - fieldName: Image Scan Age
           values:
             - value: "30"

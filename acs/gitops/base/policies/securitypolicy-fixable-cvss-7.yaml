@@ -8,7 +8,6 @@
 # Si existe fix, el remedio es actualizar la imagen: dejar correr un CVE alto con
 # parche disponible es riesgo evitable. Cubre BUILD (rompe el pipeline temprano) y
 # DEPLOY (frena imagenes vulnerables en admision).
-# "Fixable CVSS" es criterio de comparacion: NO admite booleanOperator AND/OR.
 # enforcementActions VACIA = modo INFORM: en produccion bancaria se observa primero.
 # Para bloquear, agregar FAIL_BUILD_ENFORCEMENT y FAIL_DEPLOYMENT_CREATE/UPDATE_ENFORCEMENT.
 apiVersion: config.stackrox.io/v1alpha1
@@ -30,9 +29,16 @@ spec:
     - DEPLOY
   enforcementActions: []
   policySections:
+    # "Fixable" no es un criterio propio: se expresa como "Fixed By" con regex .*
+    # (existe un parche) combinado con "CVSS" >= N. Es el patron de la politica
+    # built-in "Fixable CVSS >= 7" de ACS 4.11. CVSS usa el formato ">= 7.000000".
     - sectionName: Regla principal
       policyGroups:
-        # "Fixable CVSS" es criterio de comparacion (sin booleanOperator); el value usa el formato ">= N".
-        - fieldName: Fixable CVSS
+        - fieldName: Fixed By
+          booleanOperator: OR
           values:
-            - value: ">= 7"
+            - value: ".*"
+        - fieldName: CVSS
+          booleanOperator: OR
+          values:
+            - value: ">= 7.000000"

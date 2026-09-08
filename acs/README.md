@@ -64,11 +64,10 @@ ansible-playbook acs/ansible/init-bundles.yml -e forzar_reemision=true
    con enforce porque es la regla base validada. En las de RUNTIME el enforce
    sería `KILL_POD_ENFORCEMENT` (agresivo) — se activa con criterio, no a ciegas.
 
-   > **Antes de pasar a enforce**, confirmar en la consola (Policy Management) el
-   > `fieldName`/valor exacto de las políticas marcadas `# VERIFICAR` en su YAML:
-   > algunos nombres de criterio de 4.11 (p. ej. *Allow Privilege Escalation*,
-   > *Run as Privileged User*, *Required Label*, *Image Scan Age*) conviene
-   > cotejarlos con un `roxctl policy export` real para no dejar la política inerte.
+   > Los `fieldName` y valores de las 18 políticas están **validados contra ACS
+   > 4.11**: cada una importa sin error por `POST /v1/policies/import` en Central
+   > (dry-run). Al añadir una política nueva, cotéjala igual contra la consola o
+   > un `roxctl policy export` antes de mergear, para no dejarla inerte.
 2. **Firma cosign, por Ansible** (`ansible/policies/` + `integrations.yml
    --tags firma`): dos políticas gemelas — `require-image-signature` (BUILD,
    corta el pipeline si la imagen no está firmada) y

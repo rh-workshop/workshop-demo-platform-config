@@ -31,9 +31,10 @@ spec:
   policySections:
     - sectionName: Label owner requerido
       policyGroups:
-        # Required Label usa formato clave=valor-regex; ".+" exige que exista y no este vacio. No lleva negate: la semantica de "requerido" ya alerta cuando falta.
+        # Patron de la built-in "Required Label: Owner/Team" de 4.11: formato
+        # clave=valor-regex; "owner|team=.+" exige que exista un label owner o team
+        # con valor no vacio. La semantica de "requerido" ya alerta cuando falta.
         - fieldName: Required Label
           booleanOperator: OR
           values:
-            # VERIFICAR fieldName/valor contra la consola ACS 4.11 (clave del label real: owner o app.kubernetes.io/owner).
-            - value: "owner=.+"
+            - value: "owner|team=.+"

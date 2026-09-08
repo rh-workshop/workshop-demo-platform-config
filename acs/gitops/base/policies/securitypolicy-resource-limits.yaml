@@ -29,18 +29,16 @@ spec:
   # enforcementActions vacio a proposito: modo INFORM. Para enforce agregar FAIL_DEPLOYMENT_CREATE/UPDATE_ENFORCEMENT.
   enforcementActions: []
   policySections:
-    # En 4.11 el limite ausente se expresa comparando el valor del limite con 0.
-    - sectionName: Sin limite de CPU
+    # Patron de la built-in "No CPU request or memory limit specified" de 4.11:
+    # "Container CPU Request" y "Container Memory Limit" con value "0.000000"
+    # (0 = no definido). No existe "Container CPU Limit" como fieldName en 4.11.
+    - sectionName: Sin request de CPU ni limite de memoria
       policyGroups:
-        - fieldName: Container CPU Limit
+        - fieldName: Container CPU Request
           booleanOperator: OR
           values:
-            # value "0.000" = limite no definido (equivale a ausente) en el criterio de recursos de 4.11.
-            - value: 0.000
-    - sectionName: Sin limite de memoria
-      policyGroups:
+            - value: "0.000000"
         - fieldName: Container Memory Limit
           booleanOperator: OR
           values:
-            # value "0" = limite de memoria no definido en 4.11.
-            - value: "0"
+            - value: "0.000000"

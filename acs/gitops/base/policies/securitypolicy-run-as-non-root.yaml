@@ -27,10 +27,13 @@ spec:
     - DEPLOY
   enforcementActions: []
   policySections:
+    # No existe "Run as Privileged User" como fieldName en 4.11. El contenedor que
+    # corre como root se detecta con "Image User" = 0 o root, patron de la built-in
+    # "Docker CIS 4.1: Ensure That a User for the Container Has Been Created".
     - sectionName: Regla principal
       policyGroups:
-        # "Run as Privileged User" es criterio de comparacion; value "true" detecta el contenedor corriendo como root (UID 0).
-        # VERIFICAR fieldName/valor contra la consola ACS 4.11 (Policy Management): confirmar si el criterio se llama "Run as Privileged User" o si se usa runAsUser=0.
-        - fieldName: Run as Privileged User
+        - fieldName: Image User
+          booleanOperator: OR
           values:
-            - value: "true"
+            - value: "0"
+            - value: "root"

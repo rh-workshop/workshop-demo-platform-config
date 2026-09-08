@@ -31,14 +31,15 @@ spec:
   policySections:
     - sectionName: Gestores de paquetes en la imagen
       policyGroups:
-        # Image Component detecta el componente instalado; los valores son las regex de la politica base "Red Hat Package Manager in Image" de 4.11.
+        # "Image Component" exige el formato nombre=version (regex ^[^=]+=.*$):
+        # el "=" final matchea cualquier version del gestor de paquetes instalado.
         - fieldName: Image Component
           booleanOperator: OR
           values:
-            - value: "apt(-get)?"
-            - value: "dpkg"
-            - value: "rpm"
-            - value: "yum"
-            - value: "dnf"
-            - value: "microdnf"
-            - value: "apk"
+            - value: "apt="
+            - value: "dpkg="
+            - value: "rpm="
+            - value: "yum="
+            - value: "dnf="
+            - value: "microdnf="
+            - value: "apk="

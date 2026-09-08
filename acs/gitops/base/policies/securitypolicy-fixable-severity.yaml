@@ -28,10 +28,16 @@ spec:
     - DEPLOY
   enforcementActions: []
   policySections:
+    # "Fixable Severity" se expresa como "Fixed By" .* (hay parche) + "Severity"
+    # >= IMPORTANT. Es el patron de la built-in "Fixable Severity at least Important"
+    # de ACS 4.11 — verificado contra la consola.
     - sectionName: Regla principal
       policyGroups:
-        # "Fixable Severity at least Important" es criterio de comparacion; combina severidad y disponibilidad de fix.
-        # VERIFICAR fieldName/valor contra la consola ACS 4.11 (Policy Management > Fixable Severity at least Important): confirmar nombre exacto y si requiere value.
-        - fieldName: Fixable Severity at least Important
+        - fieldName: Fixed By
+          booleanOperator: OR
           values:
-            - value: "true"
+            - value: ".*"
+        - fieldName: Severity
+          booleanOperator: OR
+          values:
+            - value: ">= IMPORTANT"
