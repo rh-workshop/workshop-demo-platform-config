@@ -1,0 +1,44 @@
+# Politica de seguridad de ACS COMO CODIGO (GitOps), no por API.
+#
+# En ACS 4.11 las politicas SI tienen CRD (SecurityPolicy), reconciliado por el
+# config-controller de Central. Por eso van aqui, versionadas y sincronizadas por
+# Argo, en vez de por un playbook imperativo.
+#
+# Esta politica detecta la PRESENCIA de gestores de paquetes (apt/yum/dnf/apk) en la
+# imagen: una imagen productiva no deberia poder instalar paquetes en caliente, eso
+# amplia la superficie de ataque y rompe la inmutabilidad del artefacto.
+# enforcementActions VACIO = modo INFORM: observamos primero. Para forzar en BUILD se
+# agrega FAIL_BUILD_ENFORCEMENT.
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  annotations:
+    # El CRD lo instala ACM (OperatorPolicy), no este sync: sin esto el dry-run del arranque en frio invalida la Application entera.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: package-manager-run
+  namespace: stackrox
+spec:
+  policyName: Gestor de paquetes presente en la imagen
+  description: Una imagen con apt, yum, dnf o apk permite instalar software en caliente y amplia la superficie de ataque.
+  severity: MEDIUM_SEVERITY
+  categories:
+    - Security Best Practices
+    - Docker CIS
+  lifecycleStages:
+    - BUILD
+  # enforcementActions vacio a proposito: modo INFORM. Para enforce agregar FAIL_BUILD_ENFORCEMENT.
+  enforcementActions: []
+  policySections:
+    - sectionName: Gestores de paquetes en la imagen
+      policyGroups:
+        # Image Component detecta el componente instalado; los valores son las regex de la politica base "Red Hat Package Manager in Image" de 4.11.
+        - fieldName: Image Component
+          booleanOperator: OR
+          values:
+            - value: "apt(-get)?"
+            - value: "dpkg"
+            - value: "rpm"
+            - value: "yum"
+            - value: "dnf"
+            - value: "microdnf"
+            - value: "apk"

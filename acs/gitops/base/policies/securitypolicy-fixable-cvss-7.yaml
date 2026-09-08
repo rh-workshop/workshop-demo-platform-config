@@ -1,0 +1,38 @@
+# Politica de seguridad de ACS COMO CODIGO (GitOps), no por API.
+#
+# En ACS 4.11 las politicas SI tienen CRD (SecurityPolicy), reconciliado por el
+# config-controller de Central. Por eso van aqui, versionadas y sincronizadas por
+# Argo, en vez de por un playbook imperativo.
+#
+# Esta politica detecta CVEs con parche disponible (fixable) y CVSS >= 7.
+# Si existe fix, el remedio es actualizar la imagen: dejar correr un CVE alto con
+# parche disponible es riesgo evitable. Cubre BUILD (rompe el pipeline temprano) y
+# DEPLOY (frena imagenes vulnerables en admision).
+# "Fixable CVSS" es criterio de comparacion: NO admite booleanOperator AND/OR.
+# enforcementActions VACIA = modo INFORM: en produccion bancaria se observa primero.
+# Para bloquear, agregar FAIL_BUILD_ENFORCEMENT y FAIL_DEPLOYMENT_CREATE/UPDATE_ENFORCEMENT.
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  annotations:
+    # El CRD lo instala ACM (OperatorPolicy), no este sync: sin esto el dry-run del arranque en frio invalida la Application entera.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: fixable-cvss-7
+  namespace: stackrox
+spec:
+  policyName: CVE con fix y CVSS mayor o igual a 7
+  description: Una vulnerabilidad con parche disponible y CVSS mayor o igual a 7 es riesgo evitable; el remedio es actualizar la imagen.
+  severity: HIGH_SEVERITY
+  categories:
+    - Vulnerability Management
+  lifecycleStages:
+    - BUILD
+    - DEPLOY
+  enforcementActions: []
+  policySections:
+    - sectionName: Regla principal
+      policyGroups:
+        # "Fixable CVSS" es criterio de comparacion (sin booleanOperator); el value usa el formato ">= N".
+        - fieldName: Fixable CVSS
+          values:
+            - value: ">= 7"

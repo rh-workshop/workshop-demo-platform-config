@@ -1,0 +1,38 @@
+# Politica de seguridad de ACS COMO CODIGO (GitOps), no por API.
+#
+# En ACS 4.11 las politicas SI tienen CRD (SecurityPolicy), reconciliado por el
+# config-controller de Central. Por eso van aqui, versionadas y sincronizadas por
+# Argo, en vez de por un playbook imperativo.
+#
+# Esta politica detecta contenedores que NO dropean todas las capabilities de Linux.
+# Buena practica: drop ALL y anadir solo las estrictamente necesarias, minimizando
+# los privilegios del proceso dentro del contenedor.
+# "Drop Capabilities" es criterio de comparacion: NO admite booleanOperator AND/OR.
+# enforcementActions VACIA = modo INFORM: en produccion bancaria se observa primero.
+# Para bloquear en admision, agregar FAIL_DEPLOYMENT_CREATE/UPDATE_ENFORCEMENT y SCALE_TO_ZERO_ENFORCEMENT.
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  annotations:
+    # El CRD lo instala ACM (OperatorPolicy), no este sync: sin esto el dry-run del arranque en frio invalida la Application entera.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: drop-all-capabilities
+  namespace: stackrox
+spec:
+  policyName: No dropea todas las capabilities
+  description: Un contenedor que no dropea todas las capabilities de Linux conserva privilegios innecesarios; la buena practica es drop ALL y anadir solo lo indispensable.
+  severity: MEDIUM_SEVERITY
+  categories:
+    - Security Best Practices
+  lifecycleStages:
+    - DEPLOY
+  enforcementActions: []
+  policySections:
+    - sectionName: Regla principal
+      policyGroups:
+        # "Drop Capabilities" es criterio de comparacion (sin booleanOperator); negate=true dispara cuando NO se dropea ALL.
+        # VERIFICAR fieldName/valor contra la consola ACS 4.11 (Policy Management > Drop Capabilities): confirmar semantica de negate con value ALL.
+        - fieldName: Drop Capabilities
+          negate: true
+          values:
+            - value: ALL

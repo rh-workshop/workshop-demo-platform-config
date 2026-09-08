@@ -1,0 +1,37 @@
+# Politica de seguridad de ACS COMO CODIGO (GitOps), no por API.
+#
+# En ACS 4.11 las politicas SI tienen CRD (SecurityPolicy), reconciliado por el
+# config-controller de Central. Por eso van aqui, versionadas y sincronizadas por
+# Argo, en vez de por un playbook imperativo.
+#
+# Esta politica detecta CVEs de severidad Important o superior CON parche disponible.
+# Complementa a la de CVSS: usa la clasificacion de severidad del proveedor (mas
+# alineada al riesgo real que el numero crudo). Cubre BUILD y DEPLOY.
+# enforcementActions VACIA = modo INFORM: en produccion bancaria se observa primero.
+# Para bloquear, agregar FAIL_BUILD_ENFORCEMENT y FAIL_DEPLOYMENT_CREATE/UPDATE_ENFORCEMENT.
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  annotations:
+    # El CRD lo instala ACM (OperatorPolicy), no este sync: sin esto el dry-run del arranque en frio invalida la Application entera.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: fixable-severity
+  namespace: stackrox
+spec:
+  policyName: CVE con fix de severidad Important o superior
+  description: Una vulnerabilidad clasificada Important o superior con parche disponible debe remediarse actualizando la imagen antes de desplegar.
+  severity: HIGH_SEVERITY
+  categories:
+    - Vulnerability Management
+  lifecycleStages:
+    - BUILD
+    - DEPLOY
+  enforcementActions: []
+  policySections:
+    - sectionName: Regla principal
+      policyGroups:
+        # "Fixable Severity at least Important" es criterio de comparacion; combina severidad y disponibilidad de fix.
+        # VERIFICAR fieldName/valor contra la consola ACS 4.11 (Policy Management > Fixable Severity at least Important): confirmar nombre exacto y si requiere value.
+        - fieldName: Fixable Severity at least Important
+          values:
+            - value: "true"

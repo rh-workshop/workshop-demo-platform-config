@@ -1,0 +1,42 @@
+# Politica de seguridad de ACS COMO CODIGO (GitOps), no por API.
+#
+# En ACS 4.11 las politicas SI tienen CRD (SecurityPolicy), reconciliado por el
+# config-controller de Central. Por eso van aqui, versionadas y sincronizadas por
+# Argo, en vez de por un playbook imperativo.
+#
+# Politica RUNTIME: detecta la ejecucion de un shell interactivo (bash/sh/zsh) dentro
+# de un contenedor en produccion, senal tipica de acceso manual o de un atacante.
+# lifecycleStages [RUNTIME] + eventSource DEPLOYMENT_EVENT observan procesos en pods vivos.
+# enforcementActions VACIO = modo INFORM: observamos primero. En runtime el enforce seria
+# KILL_POD_ENFORCEMENT (mata el pod), accion AGRESIVA que se activa solo con criterio.
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  annotations:
+    # El CRD lo instala ACM (OperatorPolicy), no este sync: sin esto el dry-run del arranque en frio invalida la Application entera.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: interactive-shell
+  namespace: stackrox
+spec:
+  policyName: Shell interactivo en contenedor
+  description: La ejecucion de un shell (bash, sh, zsh) en un contenedor en produccion suele indicar acceso manual o intrusion.
+  severity: HIGH_SEVERITY
+  categories:
+    - Security Best Practices
+  lifecycleStages:
+    - RUNTIME
+  eventSource: DEPLOYMENT_EVENT
+  # enforcementActions vacio a proposito: modo INFORM. En runtime el enforce seria KILL_POD_ENFORCEMENT (agresivo): activar solo con criterio.
+  enforcementActions: []
+  policySections:
+    - sectionName: Proceso de shell
+      policyGroups:
+        - fieldName: Process Name
+          booleanOperator: OR
+          values:
+            - value: "bash"
+            - value: "sh"
+            - value: "zsh"
+            - value: "ash"
+            - value: "dash"
+            - value: "ksh"

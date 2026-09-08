@@ -1,0 +1,35 @@
+# Politica de seguridad de ACS COMO CODIGO (GitOps), no por API.
+#
+# En ACS 4.11 las politicas SI tienen CRD (SecurityPolicy), reconciliado por el
+# config-controller de Central. Por eso van aqui, versionadas y sincronizadas por
+# Argo, en vez de por un playbook imperativo.
+#
+# Esta politica detecta contenedores con el sistema de archivos raiz ESCRIBIBLE.
+# Un root FS de solo lectura reduce la superficie de ataque: impide que un atacante
+# modifique binarios o deje artefactos en el contenedor en caliente.
+# enforcementActions VACIA = modo INFORM: en produccion bancaria se observa primero.
+# Para bloquear en admision, agregar FAIL_DEPLOYMENT_CREATE/UPDATE_ENFORCEMENT y SCALE_TO_ZERO_ENFORCEMENT.
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  annotations:
+    # El CRD lo instala ACM (OperatorPolicy), no este sync: sin esto el dry-run del arranque en frio invalida la Application entera.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: read-only-root-fs
+  namespace: stackrox
+spec:
+  policyName: Sistema de archivos raiz escribible
+  description: Un contenedor con el sistema de archivos raiz escribible permite modificar binarios o dejar artefactos en caliente; se recomienda montarlo como solo lectura.
+  severity: HIGH_SEVERITY
+  categories:
+    - Security Best Practices
+  lifecycleStages:
+    - DEPLOY
+  enforcementActions: []
+  policySections:
+    - sectionName: Regla principal
+      policyGroups:
+        # "Read-Only Root Filesystem" es criterio de comparacion; value "false" detecta el FS raiz escribible.
+        - fieldName: Read-Only Root Filesystem
+          values:
+            - value: "false"

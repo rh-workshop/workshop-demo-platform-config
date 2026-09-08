@@ -7,7 +7,33 @@ kind: Kustomization
 resources:
   - central.yaml
   - externalsecret-acs-smtp.yaml
+  # Catalogo de politicas declarativas (SecurityPolicy CRD, gobernadas por Argo).
+  # TODAS arrancan en modo INFORM (enforcementActions vacio): en produccion se
+  # observa primero en Violations y solo despues se agregan las acciones de
+  # enforce. Ninguna se toca a mano en la consola — el CRD es la fuente de verdad.
+  # --- Higiene de imagen ---
   - policies/securitypolicy-disallow-latest-tag.yaml
+  - policies/securitypolicy-resource-limits.yaml
+  - policies/securitypolicy-package-manager-run.yaml
+  - policies/securitypolicy-curl-wget-in-image.yaml
+  - policies/securitypolicy-ssh-port-exposed.yaml
+  - policies/securitypolicy-required-label-owner.yaml
+  # --- Endurecimiento del workload (contexto de seguridad del Deployment) ---
+  - policies/securitypolicy-read-only-root-fs.yaml
+  - policies/securitypolicy-no-privileged.yaml
+  - policies/securitypolicy-drop-all-capabilities.yaml
+  - policies/securitypolicy-no-privilege-escalation.yaml
+  - policies/securitypolicy-secret-env-var.yaml
+  - policies/securitypolicy-run-as-non-root.yaml
+  # --- Vulnerabilidades (CVE) ---
+  - policies/securitypolicy-fixable-cvss-7.yaml
+  - policies/securitypolicy-fixable-severity.yaml
+  - policies/securitypolicy-image-scanned.yaml
+  # --- Runtime (eventSource DEPLOYMENT_EVENT; enforce seria KILL_POD, agresivo) ---
+  - policies/securitypolicy-interactive-shell.yaml
+  - policies/securitypolicy-process-uid-0.yaml
+  - policies/securitypolicy-crypto-mining.yaml
+  - policies/securitypolicy-package-exec-runtime.yaml
   # Las dos politicas de firma (BUILD y DEPLOY) NO van por Argo: referencian el
   # ID de la SignatureIntegration, que lo genera Central en cada instalacion.
   # Las aplica acs/ansible/integrations.yml con el ID real — ver acs/ansible/policies/.
