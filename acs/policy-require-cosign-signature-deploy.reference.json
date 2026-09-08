@@ -1,0 +1,49 @@
+{
+    "name": "Require verified cosign signature at deployment",
+    "description": "No business workload can be deployed with an image lacking a cosign signature verifiable with the pipeline public key.",
+    "rationale": "Ensures image integrity and provenance: only images signed by the authorized pipeline are allowed to run.",
+    "remediation": "Sign the image with cosign using the pipeline key and verify that the signature was published to the registry.",
+    "disabled": false,
+    "categories": [
+        "Security Best Practices"
+    ],
+    "lifecycleStages": [
+        "DEPLOY"
+    ],
+    "eventSource": "NOT_APPLICABLE",
+    "exclusions": [],
+    "scope": [
+        {
+            "cluster": "",
+            "namespace": "CHANGE_ME_BUSINESS_NAMESPACE_REGEX",
+            "label": null,
+            "clusterLabel": null,
+            "namespaceLabel": null
+        }
+    ],
+    "severity": "CRITICAL_SEVERITY",
+    "enforcementActions": [],
+    "notifiers": [],
+    "policyVersion": "1.1",
+    "policySections": [
+        {
+            "sectionName": "Signature required at admission",
+            "policyGroups": [
+                {
+                    "fieldName": "Image Signature Verified By",
+                    "booleanOperator": "OR",
+                    "negate": false,
+                    "values": [
+                        {
+                            "value": "CHANGE_ME_SIGNATURE_INTEGRATION_ID"
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "mitreAttackVectors": [],
+    "criteriaLocked": false,
+    "mitreVectorsLocked": false,
+    "isDefault": false
+}
