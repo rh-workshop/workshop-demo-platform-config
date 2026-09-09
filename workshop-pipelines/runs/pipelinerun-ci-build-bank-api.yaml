@@ -16,6 +16,8 @@ spec:
   timeouts:
     pipeline: 1h0m0s
   params:
+    - name: config-push-mode
+      value: pr
     - name: revision
       value: f2c8bfd2003310d0b067c545c9430139972e84c5
     # Repositorio SIN tag en el registro corporativo (Quay, la variable quay_host del bootstrap): el tag git-<sha> lo pone el pipeline.
