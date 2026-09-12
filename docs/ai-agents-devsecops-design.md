@@ -188,15 +188,25 @@ deja un hueco.
 | `securityContext` restringido (task) | escalada/caps | ✅ `task-agent-cve-triage.yaml` |
 | **NetworkPolicy** deny-all + egress mínimo | exfiltración de red | ✅ `networkpolicy-agent-cve-triage.yaml` |
 | **Kata / sandboxed containers** (operador + `KataConfig`) | exploit de **kernel** | ✅ operador en `acm/.../install-operators` + `kataconfig.yaml`; falta `runtimeClassName: kata` en el podTemplate del TaskRun y etiquetar nodos |
-| **OpenShell** (gateway + política por-acción) | política de red/herramientas más fina que NetworkPolicy | ⚠️ `[PENDIENTE]` producto NVIDIA muy nuevo: instalar según su doc oficial soportada — no se versiona un manifiesto inventado |
+| **OpenShell** (gateway + política por-acción) | política de red/herramientas más fina que NetworkPolicy | ✅ `workshop-pipelines/gitops/base/openshell/` + `application-openshell.yaml` — chart Helm OCI oficial (`ghcr.io/nvidia/openshell/helm-chart`), modo `operator`. **Experimental** (el propio proyecto lo declara); versión a fijar antes de usar |
 
-**Mínimo viable HOY (sin OpenShell):** Kata (kernel) + NetworkPolicy (red) + los
-guardrails de la task (SA least-privilege, campos tipados, salida por esquema) ya
-cubren las **dos** superficies del benchmark. La NetworkPolicy hace, de forma
-básica, lo que OpenShell hace fino (cortar exfiltración); OpenShell se añade cuando
-su instalación soportada esté disponible, para elevar a política declarativa
-evaluada por acción. **No se inventa el YAML de OpenShell** — sería config ficticia
-en un repo que va a producción.
+**Instalación de OpenShell (verificada contra `NVIDIA/OpenShell`):**
+1. **Prerrequisito cluster-scoped**: CRDs + controller de **Agent Sandbox**
+   (`kubernetes-sigs/agent-sandbox`) — provee el CR `Sandbox` (`agents.x-k8s.io`)
+   que OpenShell usa. Se aplica en bootstrap (`agent-sandbox.reference.yaml`).
+2. **Gateway**: chart Helm OCI, desplegado por Argo (`application-openshell.yaml`)
+   con `values-openshell.yaml` (modo operator, overrides de SCC de OpenShift).
+3. **Namespace + SCC**: `bootstrap/` (ns `openshell` + RoleBinding SCC al SA
+   `openshell-sandbox`).
+4. **Workspace**: chart `openshell-workspace` en cada namespace de sandbox.
+
+**Mínimo viable HOY:** Kata (kernel) + NetworkPolicy (red) + guardrails de la task
+ya cubren las **dos** superficies del benchmark. OpenShell **eleva** la
+NetworkPolicy (por namespace/puerto) a política **por-acción** evaluada por el
+gateway antes de ejecutar — el modelo "browser tab" para agentes. Como su camino
+de Kubernetes es experimental, se despliega con la **versión fijada** y tras el
+prerrequisito Agent Sandbox; hasta estabilizar, las otras tres capas sostienen el
+aislamiento.
 
 **Activar Kata en el TaskRun** (cuando el operador esté instalado y los nodos
 etiquetados): en el `PipelineRun`/overlay, `taskRunSpecs` con

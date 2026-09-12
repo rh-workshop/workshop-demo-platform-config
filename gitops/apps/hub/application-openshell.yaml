@@ -1,0 +1,52 @@
+# Application de Argo que despliega el gateway de OpenShell (aislamiento
+# out-of-process del agente IA). Chart Helm publicado como artefacto OCI en GHCR.
+#
+# PREREQUISITO cluster-scoped (NO lo instala este sync): los CRDs + controller de
+# Agent Sandbox (kubernetes-sigs/agent-sandbox), aplicados en el bootstrap. Ver
+# workshop-pipelines/gitops/base/openshell/agent-sandbox.reference.yaml. Sin la API
+# Sandbox servida, el chart falla en preflight a proposito.
+#
+# EXPERIMENTAL: el camino de Kubernetes de OpenShell esta en desarrollo activo. La
+# version se FIJA (nunca dev/latest) y el upgrade se decide por PR en Git.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: config-openshell
+  labels:
+    workshop.redhat.com/layer: infrastructure
+    workshop.redhat.com/component: openshell
+    workshop.redhat.com/environment: hub
+  annotations:
+    # Tras Agent Sandbox (prereq) y junto a los demas guardrails del agente.
+    argocd.argoproj.io/sync-wave: "1"
+  namespace: openshift-gitops
+spec:
+  project: platform-hub
+  sources:
+    # 1. El chart de OpenShell desde GHCR (OCI). CHANGE_ME_OPENSHELL_VERSION: fijar
+    #    el tag de un release etiquetado (p. ej. 0.6.0), nunca 0.0.0-dev.
+    - repoURL: ghcr.io/nvidia/openshell
+      chart: helm-chart
+      targetRevision: CHANGE_ME_OPENSHELL_VERSION
+      helm:
+        valueFiles:
+          - $values/workshop-pipelines/gitops/base/openshell/values-openshell.yaml
+    # 2. El repo, para los valores y los recursos de arranque (namespace, SCC).
+    - repoURL: https://github.com/rh-workshop/workshop-demo-platform-config.git
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/rh-workshop/workshop-demo-platform-config.git
+      targetRevision: main
+      path: workshop-pipelines/gitops/base/openshell/bootstrap
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshell
+  syncPolicy:
+    retry:
+      limit: 20
+      backoff: {duration: 30s, factor: 2, maxDuration: 10m}
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

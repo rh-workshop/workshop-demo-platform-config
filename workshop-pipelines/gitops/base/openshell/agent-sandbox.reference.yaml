@@ -1,0 +1,19 @@
+# PREREQUISITO cluster-scoped de OpenShell: los CRDs + controller de Agent Sandbox.
+#
+# NO es un manifiesto que se aplique desde aqui: es la REFERENCIA del prerequisito
+# que OpenShell exige antes de desplegar el gateway. Provee el CR `Sandbox`
+# (`agents.x-k8s.io`, v1beta1/v1alpha1) que el driver de kubernetes de OpenShell
+# usa para crear los sandboxes del agente.
+#
+# El chart de OpenShell NO lo instala (es cluster-scoped) y falla en preflight si
+# el cluster no sirve la API Sandbox. Se aplica UNA vez en el bootstrap, con la
+# version fijada (nunca 'latest' en produccion — sustituir <version> por el tag):
+#
+#   oc apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/<version>/manifest.yaml
+#
+# Proyecto upstream (Kubernetes SIG): https://github.com/kubernetes-sigs/agent-sandbox
+# Es el mismo patron que los CRDs de operadores: instalacion cluster-scoped a mano
+# en el bootstrap, config del operando (los Sandbox) por el flujo declarativo.
+#
+# Se versiona como .reference.yaml (plantilla documental no aplicada) siguiendo la
+# convencion del repo para manifiestos cluster-scoped que no gestiona Argo.

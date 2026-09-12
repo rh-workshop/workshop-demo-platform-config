@@ -1,0 +1,33 @@
+# Valores del chart de OpenShell (ghcr.io/nvidia/openshell/helm-chart).
+# Overrides tomados de la guia oficial de OpenShift del proyecto:
+#   https://docs.nvidia.com/openshell/latest/kubernetes/openshift
+#
+# En OpenShift el SCC gestiona fsGroup/runAsUser, asi que se anulan aqui para que
+# no choquen con los que asigna el cluster (mismo patron que la guia oficial).
+# TLS del gateway: en produccion se termina con cert-manager (ver
+# ci/values-cert-manager.yaml del chart); aqui documentado como pendiente.
+
+# Modo de workspace: operator — un gateway sirve varios namespaces
+# pre-aprovisionados descubiertos por label (GitOps), no auto-creados.
+workspaceMode: operator
+
+# En modo operator, los recursos namespace-scoped del sandbox los provee el chart
+# openshell-workspace en cada namespace, no este release del gateway.
+workspaceResources:
+  enabled: false
+
+# El gateway descubre los namespaces de workspace permitidos por este label
+# (coincide con el label del namespace.yaml). Falla cerrado si un namespace no lo lleva.
+operator:
+  namespaceLabel: "openshell.nvidia.com/workspace=true"
+
+# OpenShift: el SCC asigna fsGroup y runAsUser; anularlos evita el conflicto.
+podSecurityContext:
+  fsGroup: null
+securityContext:
+  runAsUser: null
+
+# CHANGE_ME: en produccion, TLS del gateway por cert-manager en vez de deshabilitarlo.
+# server.disableTls=true es solo para el arranque; sustituir por la config TLS real.
+server:
+  disableTls: true

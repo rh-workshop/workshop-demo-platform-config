@@ -1,0 +1,7 @@
+# Recursos de arranque de OpenShell que aplica Argo (namespace + SCC del sandbox).
+# El gateway (chart Helm) y el prereq Agent Sandbox (cluster-scoped) van aparte.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - clusterrolebinding-scc.yaml
