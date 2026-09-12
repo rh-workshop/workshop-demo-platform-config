@@ -1,0 +1,11 @@
+# Namespace del gateway de OpenShell y de los pods de sandbox del agente.
+# Los sandboxes se despliegan aqui y usan el SA openshell-sandbox (ver
+# clusterrolebinding-scc.yaml para el SCC que necesitan).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshell
+  labels:
+    # Label que el gateway (modo operator) usa para descubrir los namespaces de
+    # workspace permitidos (operator_namespace_label). Falla cerrado si falta.
+    openshell.nvidia.com/workspace: "true"

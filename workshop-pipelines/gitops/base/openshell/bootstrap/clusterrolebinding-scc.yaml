@@ -1,0 +1,22 @@
+# SCC para el SA openshell-sandbox: los pods de sandbox del agente lo requieren
+# (guia oficial de OpenShift del proyecto). Se concede por RoleBinding namespaced
+# al ClusterRole de la SCC, acotado al namespace openshell — no cluster-wide.
+#
+# NOTA de endurecimiento: la guia de arranque usa la SCC 'privileged'. Para
+# produccion bancaria conviene evaluar una SCC mas restringida (o dejar que Kata,
+# via runtimeClassName, aporte el aislamiento y bajar la SCC): 'privileged' aqui
+# es un atajo de arranque, no el destino. CHANGE_ME al endurecer.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: openshell-sandbox-scc
+  namespace: openshell
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  # ClusterRole que otorga uso de la SCC 'privileged' (lo provee OpenShift).
+  name: system:openshift:scc:privileged
+subjects:
+  - kind: ServiceAccount
+    name: openshell-sandbox
+    namespace: openshell
