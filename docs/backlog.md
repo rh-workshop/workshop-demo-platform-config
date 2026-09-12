@@ -457,3 +457,69 @@ y estado real del soporte en la cadena Red Hat. No es un hallazgo de seguridad
 que bloquee — es preparación estratégica. Relacionado con el ángulo "agentes de
 IA en el flujo" (otra tendencia emergente de DevSecOps): ambos son *futuro*, no
 requisito actual.
+
+## 11. Agentes de IA en el flujo DevSecOps — A IMPLEMENTAR (piloto)
+
+**Objetivo.** Añadir agentes de IA sobre el pipeline determinista actual, sin
+reemplazarlo. El pipeline (Tekton, escaneo ACS, firma, SBOM) es la base que
+audita el regulador; los agentes van **encima** para triage, remediación y
+explicabilidad. Patrón rector: **el agente propone, el humano dispone**.
+
+### Cómo lo hacen las empresas grandes (investigación 2026)
+
+El cambio de 2026 es de "copiloto que sugiere" a "agente que actúa en varios
+pasos". Pero la banca va con cautela (OCC Spring 2026: uso limitado a casos
+concretos con guardrails y human-in-the-loop). Los tres casos que sí están en
+producción en pipelines:
+- **Triage de CVE por explotabilidad/runtime** (no el scan crudo) — el uso #1.
+- **Remediación autónoma en sandbox aislado** — propone el PR, no aplica a ciegas.
+- **Análisis de SBOM** — dependencias abandonadas, licencias, typosquatting.
+
+**El diferenciador no es "¿usamos agentes?" sino "¿podemos gobernarlos con
+auditabilidad?"**. Las consultas que hace toda empresa regulada:
+
+| Pregunta | Control exigido |
+|---|---|
+| ¿Qué decide vs. qué recomienda el agente? | Frontera clara acción/consejo |
+| ¿Qué requiere firma humana? | Human-in-the-loop en acciones de alto riesgo |
+| ¿Cómo se documenta cada decisión? | Audit trail: modelo, versión, política, identidad, contexto |
+| ¿Quién es el dueño? | AI Model Risk Owner nombrado ANTES de producción |
+| ¿Qué puede tocar? | Least-privilege: solo los sistemas de su tarea |
+| ¿Hay botón de parada? | Kill switch + override humano |
+
+**Riesgos propios de agentes** (no cyber tradicional): **prompt injection** (el
+#1 — un atacante mete instrucciones en los datos que el agente lee: descripción
+de un CVE, un commit → lo desvía; regla: tratar todo input externo como
+adversario), shadow AI, cadenas de acción no autorizadas.
+
+**Patrón arquitectónico adoptado:** guardrails en la **capa de ejecución**, no
+"encima" del agente — un guardrail en el runtime no lo salta un agente que se
+porta mal. Ejemplo real: cada acción requiere un token de una capa de autoridad
+que valida actor + política y escribe a un audit bundle a prueba de manipulación
+ANTES de ejecutar.
+
+**Marco regulatorio (ya en vigor):** NIST AI RMF, SR 11-7 (model risk, extendido
+a agentes), DORA (EU, ene 2025), EU AI Act (BFSI = alto riesgo). Gartner: >50% de
+grandes empresas con auditorías de IA obligatorias en 2026.
+
+**Frontera nueva — ML-BOM:** el modelo de IA es una dependencia de terceros más
+(datos de entrenamiento, arquitectura, benchmarks), que los scanners no leen.
+Igual que el SBOM del código, hace falta un ML-BOM del modelo.
+
+### Aterrizaje a nuestro pipeline (primer piloto)
+
+**Primer agente: triage de CVE.** Lee el `scan.json` y `sbom.spdx.json` que las
+tareas actuales YA generan, prioriza por explotabilidad, y **comenta el PR** (no
+mergea, no aprueba excepciones). LLM **self-hosted** (OpenShift AI / MaaS de Red
+Hat — nunca API pública con código del banco), guardrails en ejecución, audit
+trail, humano aprobando. Rollout **observe-first** igual que las políticas ACS
+(Inform→Enforce): primero solo comenta, luego abre PR de fix.
+
+> **Diseño de implementación detallado:** ver el documento que produce esta
+> revisión (agentes concretos, dónde se insertan en el pipeline, arquitectura del
+> LLM self-hosted, guardrails en capa de ejecución, audit trail, defensa contra
+> prompt injection, ML-BOM y fases de rollout).
+
+Fuentes: Cloudsmith (agentic supply chain governance 2026), Backbase (guardrails
+banca), KPMG (agentic AI en compliance financiero), arXiv 2512.23480 (defensa
+agéntica de la cadena de suministro), Checkmarx (DevSecOps AI-era 2026).
