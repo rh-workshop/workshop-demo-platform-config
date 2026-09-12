@@ -420,3 +420,40 @@ imágenes firmadas viejas se pierden — asumible en el lab) y retirar el
 `ignoreDifferences` de NooBaa añadido en `gitops/apps/hub/application-quay.yaml`
 (commit 04e8ce6) cuando NooBaa deje de desplegarse. No se implementó en esta
 pasada para no romper el CI en curso ni tocar ficheros con dueño en paralelo.
+
+## 10. Criptografía post-cuántica (PQC) en la cadena de suministro — REVISIÓN 1 (roadmap)
+
+**Qué es.** Los algoritmos de firma y cifrado que usamos hoy (ECDSA, RSA) los
+rompe un computador cuántico suficientemente grande. NIST ya estandarizó los
+reemplazos resistentes a cuántica (2024): **ML-KEM/Kyber** (FIPS 203, intercambio
+de claves), **ML-DSA/Dilithium** (FIPS 204, firma) y **SLH-DSA/SPHINCS+**
+(FIPS 205, firma basada en hash). El riesgo para banca es *"harvest now, decrypt
+later"*: capturar hoy tráfico o artefactos firmados para romperlos cuando exista
+la cuántica — un horizonte de años, pero los datos y las firmas de larga vida
+(hipotecas, contratos, imágenes de release archivadas) se ven afectados hoy.
+
+**Qué usamos hoy (todo cripto CLÁSICA, ningún PQC):**
+- Firma de imágenes cosign → **ECDSA P-256** (`cosign generate-key-pair`).
+- mTLS/TLS del gateway, Keycloak, ACS, Quay → RSA/ECDSA.
+- Verificación de firma en ACS → valida esas firmas ECDSA.
+
+**Qué revisar en la REVISIÓN 1 (sin tocar lo montado todavía):**
+1. **Estado de PQC en cosign/Sigstore** — ¿ya firma con ML-DSA o híbrido? (upstream
+   lo está incorporando; confirmar versión y soporte productivo).
+2. **crypto-policies de RHEL 10 / OpenSSL 3.x** — perfiles PQC disponibles y si
+   OpenShift 4.x los expone en el ingress/API server.
+3. **Firma híbrida** (clásica + PQC) como patrón de transición: no se rompe la
+   verificación actual y se añade resistencia cuántica.
+4. **Inventario de activos criptográficos** (CBOM — Cryptography Bill of Materials):
+   qué algoritmos usa cada componente, para saber qué migrar y en qué orden. Encaja
+   junto al SBOM que ya generamos.
+5. **Alcance realista**: qué firmas/certificados tienen vida larga y merecen PQC
+   primero (release archivadas, CA corporativa) vs. lo efímero (tokens, TLS de
+   sesión) que se renueva solo.
+
+**Entregable de la revisión.** Nota de roadmap PQC para el cliente (banca,
+horizonte 3-5 años): qué es cuántica-vulnerable hoy, prioridad de migración,
+y estado real del soporte en la cadena Red Hat. No es un hallazgo de seguridad
+que bloquee — es preparación estratégica. Relacionado con el ángulo "agentes de
+IA en el flujo" (otra tendencia emergente de DevSecOps): ambos son *futuro*, no
+requisito actual.
