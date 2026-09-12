@@ -69,6 +69,11 @@ spec:
     - {name: scan-severity-threshold, default: CRITICAL}
     # "false" informa de los CVEs y sigue; "true" corta el pipeline. En producción va en "true".
     - {name: scan-fail-on-violation, default: "false"}
+    # Agente IA de triage de CVE. Desactivado por defecto: el agente es opt-in y
+    # solo corre si hay modelo servido (workspace llm-credentials) y se activa aqui.
+    - {name: agent-triage-enabled, default: "false"}
+    # El agente PROPONE; en la fase piloto no corta (observe-first), como scan-fail-on-violation.
+    - {name: agent-fail-on-critical, default: "false"}
     # Endpoint de ACS Central; por defecto el Service interno del cluster.
     - {name: rox-central-endpoint, default: "central.stackrox.svc:443"}
     # Analizador SAST espejado en el registro corporativo (nunca desde Docker Hub en
@@ -110,6 +115,10 @@ spec:
     - name: signing-key
     # Secret acs-pipeline-credentials (rox-api-token + ca.pem de Central) para roxctl.
     - name: acs-credentials
+    # Secret agent-llm-credentials (llm-endpoint + llm-token + llm-model del modelo en RHOAI).
+    # Opcional: solo lo usa la task agent-cve-triage cuando agent-triage-enabled=true.
+    - name: llm-credentials
+      optional: true
   results:
     - name: image-digest
       value: $(tasks.resolve-digest.results.image-digest)
@@ -515,6 +524,27 @@ spec:
         - {name: rox-central-endpoint, value: $(params.rox-central-endpoint)}
       workspaces:
         - {name: acs-credentials, workspace: acs-credentials}
+
+    # AGENTE IA (triage de CVE): PROPONE, no decide. Corre tras el escaneo, lee el
+    # resultado de Central y prioriza por explotabilidad. Observe-first: fail-on-critical
+    # en false, no corta el pipeline (igual que scan-fail-on-violation al arrancar).
+    # Aislamiento out-of-process: NetworkPolicy + (recomendado) runtimeClassName kata.
+    # Solo se activa si se pasa el workspace llm-credentials; ver docs/ai-agents-devsecops-design.md.
+    - name: agent-cve-triage
+      runAfter: [scan-image]
+      when:
+        # Se salta limpio si no hay agente configurado (el workspace es opcional en la fase piloto).
+        - input: "$(params.agent-triage-enabled)"
+          operator: in
+          values: ["true"]
+      taskRef: {name: agent-cve-triage}
+      params:
+        - {name: image-ref, value: "$(params.image-repository)@$(tasks.resolve-digest.results.image-digest)"}
+        - {name: rox-central-endpoint, value: $(params.rox-central-endpoint)}
+        - {name: fail-on-critical, value: $(params.agent-fail-on-critical)}
+      workspaces:
+        - {name: acs-credentials, workspace: acs-credentials}
+        - {name: llm-credentials, workspace: llm-credentials}
 
     - name: clone-config-repo
       # Corre en paralelo con firma y escaneo: solo prepara el clon; la promoción espera a las puertas.

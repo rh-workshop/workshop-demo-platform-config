@@ -132,6 +132,50 @@ pueda hacer daño aunque quiera.**
   (un commit) o escalar a cero el modelo servido. Sin el endpoint del modelo, la
   task falla cerrada y el pipeline sigue su comportamiento determinista previo.
 
+### 4.1 Aislamiento en capas con NVIDIA OpenShell + OpenShift sandboxed containers
+
+El principio rector (Red Hat + NVIDIA): **enforcement out-of-process**. Un
+guardrail que vive DENTRO del agente (prompt de sistema, harness) se puede eludir
+por prompt injection — es "un proceso de larga duración vigilándose a sí mismo".
+El control tiene que estar en la infraestructura, **fuera del alcance del agente**.
+Ninguna sandbox sola cubre todo: se combinan dos capas.
+
+**Capa 1 — NVIDIA OpenShell (por encima del kernel) `[HOY, recomendado]`.**
+Runtime open source para ejecutar agentes en sandbox con política declarativa
+YAML. Es el componente que debemos usar para gobernar al agente:
+- **Gateway**: punto de control donde CADA acción del agente (leer, escribir,
+  ejecutar, red, delegar a otra herramienta) se evalúa contra la política ANTES
+  de llegar al host. El agente no tiene permiso técnico de sacar datos de su
+  sandbox salvo que la política lo permita → corta exfiltración de credenciales y
+  de datos (el `scan.json` no sale).
+- **Sandbox por agente**: aislamiento de red y sistema programable, pensado para
+  agentes de larga duración; el agente puede "romper" su entorno sin tocar el host.
+- **Driver de OpenShift**: OpenShell corre cada agente como un pod de Kubernetes
+  con la política aplicada — se despliega en el cluster y se crea el sandbox, sin
+  integración extra. Envuelve el harness del agente y mueve el punto de control
+  definitivo fuera de su alcance.
+
+**Capa 2 — OpenShift sandboxed containers / Kata (en y bajo el kernel) `[HOY]`.**
+OpenShell no detiene un exploit de kernel; los sandboxed containers sí. Basados en
+Kata: cada pod recibe **su propio kernel dentro de una microVM**, con la frontera
+de aislamiento en las extensiones de virtualización del CPU (VT-x/AMD-V),
+impuesta por el hipervisor — no un namespace ni un seccomp. Se activa con
+`runtimeClassName: kata` en el `podTemplate` del TaskRun (requiere el operador
+sandboxed-containers).
+
+**Reparto:** OpenShell atrapa exfiltración/abuso de red y herramientas (sobre el
+kernel); Kata aísla exploits de kernel (en/bajo el kernel). Juntos cubren el
+perfil de amenaza completo de un agente — que es el mismo que el de un workload
+comprometido, porque el agente que procesa input no confiable (un PR, un patch,
+un `scan.json`) **es** el vector de ataque.
+
+**En nuestro repo `[HOY]`:** la task `task-agent-cve-triage.yaml` ya trae el
+securityContext restringido; `networkpolicy-agent-cve-triage.yaml` aplica el
+deny-all + egress mínimo (Central + modelo + DNS). El siguiente paso es
+envolver el step del agente con **OpenShell** (gateway + política YAML) y correr
+el TaskRun con `runtimeClassName: kata`. La NetworkPolicy es el aislamiento de red
+básico "a mano"; OpenShell lo eleva a política declarativa evaluada por acción.
+
 ---
 
 ## 5. Audit trail (SR 11-7 / DORA)
