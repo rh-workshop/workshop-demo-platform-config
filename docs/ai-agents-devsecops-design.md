@@ -169,12 +169,38 @@ perfil de amenaza completo de un agente — que es el mismo que el de un workloa
 comprometido, porque el agente que procesa input no confiable (un PR, un patch,
 un `scan.json`) **es** el vector de ataque.
 
-**En nuestro repo `[HOY]`:** la task `task-agent-cve-triage.yaml` ya trae el
-securityContext restringido; `networkpolicy-agent-cve-triage.yaml` aplica el
-deny-all + egress mínimo (Central + modelo + DNS). El siguiente paso es
-envolver el step del agente con **OpenShell** (gateway + política YAML) y correr
-el TaskRun con `runtimeClassName: kata`. La NetworkPolicy es el aislamiento de red
-básico "a mano"; OpenShell lo eleva a política declarativa evaluada por acción.
+**Benchmark de Red Hat (por qué NO basta uno solo):**
+
+| Ataque | Solo Kata | Solo OpenShell | Ambos |
+|---|---|---|---|
+| Exfiltración por prompt injection | 🔴 fuga | ✅ bloqueado | ✅ |
+| Escape de contenedor (CVE de kernel) | ✅ bloqueado | 🔴 host comprometido | ✅ |
+
+Cada tecnología cubre una clase de amenaza distinta; solo la config **dual** paró
+ambos ataques. Un agente expone las dos superficies a la vez (procesa input no
+confiable → red; ejecuta comandos → kernel), así que proteger una sin la otra
+deja un hueco.
+
+**Qué es necesario y qué está en el repo:**
+
+| Pieza | Cubre | Estado en el repo |
+|---|---|---|
+| `securityContext` restringido (task) | escalada/caps | ✅ `task-agent-cve-triage.yaml` |
+| **NetworkPolicy** deny-all + egress mínimo | exfiltración de red | ✅ `networkpolicy-agent-cve-triage.yaml` |
+| **Kata / sandboxed containers** (operador + `KataConfig`) | exploit de **kernel** | ✅ operador en `acm/.../install-operators` + `kataconfig.yaml`; falta `runtimeClassName: kata` en el podTemplate del TaskRun y etiquetar nodos |
+| **OpenShell** (gateway + política por-acción) | política de red/herramientas más fina que NetworkPolicy | ⚠️ `[PENDIENTE]` producto NVIDIA muy nuevo: instalar según su doc oficial soportada — no se versiona un manifiesto inventado |
+
+**Mínimo viable HOY (sin OpenShell):** Kata (kernel) + NetworkPolicy (red) + los
+guardrails de la task (SA least-privilege, campos tipados, salida por esquema) ya
+cubren las **dos** superficies del benchmark. La NetworkPolicy hace, de forma
+básica, lo que OpenShell hace fino (cortar exfiltración); OpenShell se añade cuando
+su instalación soportada esté disponible, para elevar a política declarativa
+evaluada por acción. **No se inventa el YAML de OpenShell** — sería config ficticia
+en un repo que va a producción.
+
+**Activar Kata en el TaskRun** (cuando el operador esté instalado y los nodos
+etiquetados): en el `PipelineRun`/overlay, `taskRunSpecs` con
+`podTemplate.runtimeClassName: kata` para la task `agent-cve-triage`.
 
 ---
 

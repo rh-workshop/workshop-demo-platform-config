@@ -28,6 +28,9 @@ resources:
   # runtimeClassName kata (sandboxed containers). Ver docs/ai-agents-devsecops-design.md.
   - task-agent-cve-triage.yaml
   - networkpolicy-agent-cve-triage.yaml
+  # KataConfig: operando de OpenShift sandboxed containers (el operador lo instala
+  # ACM). Activa la RuntimeClass kata que aisla el KERNEL del pod del agente.
+  - kataconfig.yaml
   # Comprueba que lo desplegado RESPONDE: Healthy en Argo no implica alcanzable.
   - task-smoke-test.yaml
   - task-argocd-sync.yaml

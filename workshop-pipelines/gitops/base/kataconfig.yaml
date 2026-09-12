@@ -1,0 +1,32 @@
+# KataConfig: activa el runtime Kata (OpenShift sandboxed containers) en los nodos.
+#
+# El operador lo instala ACM (OperatorPolicy en acm/.../install-operators); ESTE CR
+# es el operando que Argo reconcilia. Al aplicarlo, el operador instala el runtime
+# kata en los nodos seleccionados y crea la RuntimeClass "kata" — la que usa el
+# TaskRun del agente IA (podTemplate.runtimeClassName: kata).
+#
+# POR QUE hace falta ademas de OpenShell: OpenShell aisla la capa de aplicacion
+# (red, exfiltracion) pero NO detiene un exploit de KERNEL — sus controles dependen
+# de que el kernel se comporte bien. Kata da a cada pod su propio kernel en una
+# microVM (frontera por hardware VT-x/AMD-V), asi un escape de contenedor no toca
+# el host. El benchmark de Red Hat lo confirma: solo la config DUAL (OpenShell +
+# Kata) paro tanto la exfiltracion por prompt injection como el escape de kernel.
+#
+# SELECCION DE NODOS. Sin kataConfigPoolSelector, el runtime se instala en TODOS
+# los nodos worker (reinicio rolling de cada uno). En un cluster con nodos
+# dedicados para cargas no confiables, etiquetarlos y acotar aqui evita reiniciar
+# toda la flota. Kata requiere virtualizacion anidada disponible en el nodo.
+apiVersion: kataconfiguration.openshift.io/v1
+kind: KataConfig
+metadata:
+  name: cluster-kataconfig
+  annotations:
+    # El CRD lo trae el operador que instala ACM: sin esto el dry-run del arranque en frio invalida el sync.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  # Instalar el runtime solo en los nodos etiquetados para cargas aisladas.
+  # Quitar este selector instala Kata en todos los workers (reinicio de cada uno).
+  kataConfigPoolSelector:
+    matchLabels:
+      # Etiquetar los nodos destino: oc label node <nodo> node-role.kubernetes.io/kata-oc=
+      node-role.kubernetes.io/kata-oc: ""

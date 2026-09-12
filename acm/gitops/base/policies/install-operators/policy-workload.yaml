@@ -62,6 +62,12 @@ spec:
                 kind: Namespace
                 metadata:
                   name: stackrox
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: Namespace
+                metadata:
+                  name: openshift-sandboxed-containers-operator
     - objectDefinition:
         apiVersion: policy.open-cluster-management.io/v1beta1
         kind: OperatorPolicy
@@ -195,6 +201,29 @@ spec:
           subscription:
             name: rhacs-operator
             namespace: rhacs-operator
+            channel: stable
+            source: redhat-operators
+            sourceNamespace: openshift-marketplace
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1beta1
+        kind: OperatorPolicy
+        metadata:
+          name: sandboxed-containers-operator
+        spec:
+          # OpenShift sandboxed containers (Kata): aisla el KERNEL de cargas no
+          # confiables. Necesario para el agente IA de triage de CVE — cada pod con
+          # su propio kernel en microVM (VT-x/AMD-V), asi un exploit de kernel no
+          # escapa al host. OpenShell (capa de red/aplicacion) NO detiene esto: el
+          # benchmark de Red Hat muestra que solo la config DUAL para ambos ataques.
+          # El operando (KataConfig) lo reconcilia Argo — ver platform... / aqui solo el operador.
+          remediationAction: enforce
+          complianceType: musthave
+          upgradeApproval: Automatic
+          versions:
+            - sandboxed-containers-operator.v1.10.1   # pin: solo esta CSV; el upgrade se decide por PR en Git
+          subscription:
+            name: sandboxed-containers-operator
+            namespace: openshift-sandboxed-containers-operator
             channel: stable
             source: redhat-operators
             sourceNamespace: openshift-marketplace
