@@ -1,0 +1,44 @@
+# Politica de seguridad de ACS COMO CODIGO (GitOps), no por API.
+#
+# En ACS 4.11 las politicas SI tienen CRD (SecurityPolicy), reconciliado por el
+# config-controller de Central. Por eso van aqui, versionadas y sincronizadas por
+# Argo, en vez de por un playbook imperativo.
+#
+# Politica RUNTIME: detecta binarios de minado de criptomonedas (xmrig, minerd, etc.)
+# ejecutandose en pods vivos; su presencia es indicio claro de un contenedor comprometido.
+# lifecycleStages [RUNTIME] + eventSource DEPLOYMENT_EVENT observan procesos en ejecucion.
+# enforcementActions VACIO = modo INFORM: observamos primero. En runtime el enforce seria
+# KILL_POD_ENFORCEMENT (mata el pod), accion AGRESIVA que se activa solo con criterio.
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  annotations:
+    # El CRD lo instala ACM (OperatorPolicy), no este sync: sin esto el dry-run del arranque en frio invalida la Application entera.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: crypto-mining
+  namespace: stackrox
+spec:
+  policyName: Binario de minado de criptomonedas
+  description: La ejecucion de mineros como xmrig o minerd es indicio claro de un contenedor comprometido.
+  severity: CRITICAL_SEVERITY
+  categories:
+    - Security Best Practices
+    - Anomalous Activity
+  lifecycleStages:
+    - RUNTIME
+  eventSource: DEPLOYMENT_EVENT
+  # enforcementActions vacio a proposito: modo INFORM. En runtime el enforce seria KILL_POD_ENFORCEMENT (agresivo): activar solo con criterio.
+  enforcementActions: []
+  policySections:
+    - sectionName: Procesos de minado
+      policyGroups:
+        - fieldName: Process Name
+          booleanOperator: OR
+          values:
+            - value: "xmrig"
+            - value: "minerd"
+            - value: "cpuminer"
+            - value: "cgminer"
+            - value: "bfgminer"
+            - value: "ethminer"
+            - value: "xmr-stak"

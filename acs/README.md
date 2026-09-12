@@ -43,9 +43,31 @@ ansible-playbook acs/ansible/init-bundles.yml -e forzar_reemision=true
 
 ## Políticas de seguridad — tres capas
 
-1. **CR declarativo por Argo** (`gitops/base/policies/`): hoy
-   `disallow-latest-tag` (BUILD+DEPLOY, bloquea). Añadir una política nueva
-   que no dependa de un ID generado en runtime va aquí.
+1. **CR declarativo por Argo** (`gitops/base/policies/`): el catálogo de
+   políticas propias como `SecurityPolicy` CRD, versionado y sincronizado por
+   Argo — nunca a mano en la consola. Añadir una política que no dependa de un
+   ID generado en runtime va aquí. Organizado en cuatro grupos:
+   - **Higiene de imagen**: `disallow-latest-tag`, `resource-limits`,
+     `package-manager-run`, `curl-wget-in-image`, `ssh-port-exposed`,
+     `required-label-owner`.
+   - **Endurecimiento del workload**: `read-only-root-fs`, `no-privileged`,
+     `drop-all-capabilities`, `no-privilege-escalation`, `secret-env-var`,
+     `run-as-non-root`.
+   - **Vulnerabilidades (CVE)**: `fixable-cvss-7`, `fixable-severity`,
+     `image-scanned`.
+   - **Runtime** (`eventSource: DEPLOYMENT_EVENT`): `interactive-shell`,
+     `process-uid-0`, `crypto-mining`, `package-exec-runtime`.
+
+   **Todas arrancan en modo INFORM** (`enforcementActions` vacío): en producción
+   se observan primero en Violations y solo después se agregan las acciones de
+   enforce, comunicando a los equipos. Excepción: `disallow-latest-tag` ya viene
+   con enforce porque es la regla base validada. En las de RUNTIME el enforce
+   sería `KILL_POD_ENFORCEMENT` (agresivo) — se activa con criterio, no a ciegas.
+
+   > Los `fieldName` y valores de las 18 políticas están **validados contra ACS
+   > 4.11**: cada una importa sin error por `POST /v1/policies/import` en Central
+   > (dry-run). Al añadir una política nueva, cotéjala igual contra la consola o
+   > un `roxctl policy export` antes de mergear, para no dejarla inerte.
 2. **Firma cosign, por Ansible** (`ansible/policies/` + `integrations.yml
    --tags firma`): dos políticas gemelas — `require-image-signature` (BUILD,
    corta el pipeline si la imagen no está firmada) y
@@ -144,3 +166,41 @@ oc get securedcluster -A -o custom-columns='NS:.metadata.namespace,AVAILABLE:.st
 Si el sensor no arranca, primero revisar el init bundle (`Irreconcilable` en
 el `SecuredCluster`), no la Application de Argo — Argo la reporta `Synced`
 aunque el operador esté bloqueado por falta de certificados.
+
+## El flujo completo de extremo a extremo
+
+Qué gobierna cada control y en qué orden se pone en marcha. Regla transversal:
+**todo es manifiesto o playbook versionado — nada se toca a mano en la consola.**
+
+| # | Control | Dónde vive | Cómo se aplica |
+|---|---|---|---|
+| 1 | Central + SecuredCluster | `gitops/base/`, `gitops/secured/` | Argo (CRs) |
+| 2 | Init bundles (certs del sensor) | `ansible/init-bundles.yml` + Policy ACM | playbook + ACM |
+| 3 | Integración con Quay (lectura) | `ansible/integrations.yml --tags registro` | playbook (API) |
+| 4 | Firma cosign (`SignatureIntegration` + 2 políticas) | `ansible/policies/` + `--tags firma` | playbook (ID runtime) |
+| 5 | Catálogo de políticas propias (19) | `gitops/base/policies/` | Argo (`SecurityPolicy` CRD) |
+| 6 | Endurecimiento de built-in | `ansible/integrations.yml --tags endurecimiento` | playbook (API) |
+| 7 | Reporte de vulnerabilidades (SMTP + `ReportConfiguration`) | `ansible/integrations.yml --tags reportes` | playbook (API) + ESO |
+
+**Por qué unas por Argo y otras por Ansible:** lo que tiene CRD limpio y no
+depende de un ID generado por Central va por Argo (Central, SecuredCluster,
+las 19 `SecurityPolicy`). Lo que **solo existe tras la API de Central** —su ID
+lo genera la instalación— va por playbook idempotente: integración de registro,
+firma (referencia el ID de la `SignatureIntegration`), activar built-ins,
+notifier + `ReportConfiguration`. Un ID literal en Git no es reproducible.
+
+**Rollout recomendado (producción):**
+1. Argo despliega Central, SecuredClusters y las 19 políticas → todas en INFORM.
+2. `--tags registro` + `--tags firma` → ACS puede leer el registro y verificar firmas.
+3. Observar **Violations** unos días: ver qué cargas reales incumplirían.
+4. Confirmar los `fieldName` marcados `# VERIFICAR` contra la consola.
+5. Comunicar a los equipos, luego pasar política a política de INFORM a enforce
+   (agregar `enforcementActions`), empezando por las de menor ruido.
+6. `--tags endurecimiento` (built-ins) y `--tags reportes` (correo semanal).
+
+**Integración con el pipeline (repo `workshop-pipelines`):** el CI evalúa cada
+imagen contra ACS con `roxctl image scan` (CVEs) y `roxctl image check`
+(políticas de ciclo BUILD, incluida la firma) — ver `task-image-scan.yaml`. El
+gate de admisión (ciclo DEPLOY) lo aplican los `SecuredCluster` con estas mismas
+políticas. Build-time y deploy-time son complementarios: el pipeline protege el
+camino esperado, la admisión protege el perímetro.

@@ -1,0 +1,46 @@
+# Politica de seguridad de ACS COMO CODIGO (GitOps), no por API.
+#
+# En ACS 4.11 las politicas SI tienen CRD (SecurityPolicy), reconciliado por el
+# config-controller de Central. Por eso van aqui, versionadas y sincronizadas por
+# Argo, en vez de por un playbook imperativo.
+#
+# Politica RUNTIME: detecta la EJECUCION de un gestor de paquetes (apt/yum/dnf/apk) en
+# un pod vivo; instalar software en un contenedor en produccion rompe la inmutabilidad
+# del artefacto y suele ser parte de la fase de post-explotacion.
+# lifecycleStages [RUNTIME] + eventSource DEPLOYMENT_EVENT observan procesos en ejecucion.
+# enforcementActions VACIO = modo INFORM: observamos primero. En runtime el enforce seria
+# KILL_POD_ENFORCEMENT (mata el pod), accion AGRESIVA que se activa solo con criterio.
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  annotations:
+    # El CRD lo instala ACM (OperatorPolicy), no este sync: sin esto el dry-run del arranque en frio invalida la Application entera.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: package-exec-runtime
+  namespace: stackrox
+spec:
+  policyName: Ejecucion de gestor de paquetes en runtime
+  description: Ejecutar apt, yum, dnf o apk en un contenedor en produccion rompe la inmutabilidad del artefacto y suele ser post-explotacion.
+  severity: HIGH_SEVERITY
+  categories:
+    - Security Best Practices
+    - Anomalous Activity
+  lifecycleStages:
+    - RUNTIME
+  eventSource: DEPLOYMENT_EVENT
+  # enforcementActions vacio a proposito: modo INFORM. En runtime el enforce seria KILL_POD_ENFORCEMENT (agresivo): activar solo con criterio.
+  enforcementActions: []
+  policySections:
+    - sectionName: Ejecucion de gestor de paquetes
+      policyGroups:
+        - fieldName: Process Name
+          booleanOperator: OR
+          values:
+            - value: "apt"
+            - value: "apt-get"
+            - value: "dpkg"
+            - value: "yum"
+            - value: "dnf"
+            - value: "microdnf"
+            - value: "rpm"
+            - value: "apk"

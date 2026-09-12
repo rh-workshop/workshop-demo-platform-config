@@ -46,13 +46,14 @@ spec:
     computeResources:
       requests: {cpu: 250m, memory: 512Mi}
       limits: {cpu: "1", memory: 2Gi}
+    securityContext:
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      capabilities: {drop: [ALL]}
   steps:
     # La imagen upstream de syft es FROM scratch (sin shell): se invoca el binario directamente con args, no con script.
     - name: syft-generate
       image: $(params.scanner-image)
-      securityContext:
-        allowPrivilegeEscalation: false
-        capabilities: {drop: [ALL]}
       env:
         # syft (go-containerregistry) lee la credencial del registro del config.json de este directorio.
         - name: DOCKER_CONFIG
@@ -68,9 +69,6 @@ spec:
     - name: cosign-attest
       # Imagen de cosign soportada por Red Hat (Trusted Artifact Signer): la misma que la task de firma.
       image: registry.redhat.io/rhtas/cosign-rhel9:1.3.7
-      securityContext:
-        allowPrivilegeEscalation: false
-        capabilities: {drop: [ALL]}
       env:
         # cosign lee las credenciales del registro de este directorio (config.json).
         - name: DOCKER_CONFIG
@@ -89,6 +87,11 @@ spec:
         if [ -f "$KEYDIR/cosign.password" ]; then PASSFILE="$KEYDIR/cosign.password"; else PASSFILE="$KEYDIR/password"; fi
         COSIGN_PASSWORD="$(cat "$PASSFILE")"; export COSIGN_PASSWORD
         REF="$(params.image-repository)@$(params.image-digest)"
+        # No se atesta un predicado vacío: si syft falló a medias, el fichero existe pero sin contenido y set -eu no lo detecta.
+        if [ ! -s /var/sbom/sbom.spdx.json ]; then
+          echo "ERROR: el SBOM /var/sbom/sbom.spdx.json no existe o está vacío; no se atesta un predicado sin contenido." >&2
+          exit 1
+        fi
         # Si el binario conoce --new-bundle-format (v2.5+/v3), se apaga EXPLÍCITAMENTE para publicar la atestación en el formato clásico que ACS descubre.
         FORMAT_FLAG=""
         if cosign attest --help 2>&1 | grep -q -- '--new-bundle-format'; then FORMAT_FLAG="--new-bundle-format=false"; fi

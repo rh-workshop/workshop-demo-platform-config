@@ -44,6 +44,7 @@ spec:
       limits: {cpu: 500m, memory: 1Gi}
     securityContext:
       allowPrivilegeEscalation: false
+      runAsNonRoot: true
       capabilities: {drop: [ALL]}
     volumeMounts:
       - {name: rendered, mountPath: /var/render}

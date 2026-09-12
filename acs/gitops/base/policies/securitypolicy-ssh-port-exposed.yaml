@@ -1,0 +1,40 @@
+# Politica de seguridad de ACS COMO CODIGO (GitOps), no por API.
+#
+# En ACS 4.11 las politicas SI tienen CRD (SecurityPolicy), reconciliado por el
+# config-controller de Central. Por eso van aqui, versionadas y sincronizadas por
+# Argo, en vez de por un playbook imperativo.
+#
+# Esta politica detecta el puerto 22 (SSH) expuesto: un contenedor no debe ofrecer SSH,
+# el acceso se hace por oc/kubectl exec; un puerto 22 abierto es un vector de acceso
+# lateral fuera del control de la plataforma.
+# enforcementActions VACIO = modo INFORM: observamos primero. Para forzar en admision se
+# agregan FAIL_DEPLOYMENT_CREATE/UPDATE_ENFORCEMENT.
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  annotations:
+    # El CRD lo instala ACM (OperatorPolicy), no este sync: sin esto el dry-run del arranque en frio invalida la Application entera.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: ssh-port-exposed
+  namespace: stackrox
+spec:
+  policyName: Puerto SSH (22) expuesto
+  description: Un contenedor que expone el puerto 22 ofrece SSH y abre un vector de acceso lateral fuera del control de la plataforma.
+  severity: MEDIUM_SEVERITY
+  categories:
+    - Security Best Practices
+    - Docker CIS
+  # Solo DEPLOY: el criterio "Exposed Port" no existe en BUILD (no hay contexto de
+  # puertos del pod en tiempo de construccion) — Central rechaza la politica si se
+  # declara en BUILD.
+  lifecycleStages:
+    - DEPLOY
+  # enforcementActions vacio a proposito: modo INFORM. Para enforce agregar FAIL_DEPLOYMENT_CREATE/UPDATE_ENFORCEMENT.
+  enforcementActions: []
+  policySections:
+    - sectionName: Puerto SSH expuesto
+      policyGroups:
+        - fieldName: Exposed Port
+          booleanOperator: OR
+          values:
+            - value: "22"

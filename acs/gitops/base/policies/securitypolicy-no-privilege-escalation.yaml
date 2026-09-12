@@ -1,0 +1,35 @@
+# Politica de seguridad de ACS COMO CODIGO (GitOps), no por API.
+#
+# En ACS 4.11 las politicas SI tienen CRD (SecurityPolicy), reconciliado por el
+# config-controller de Central. Por eso van aqui, versionadas y sincronizadas por
+# Argo, en vez de por un playbook imperativo.
+#
+# Esta politica detecta contenedores con allowPrivilegeEscalation habilitado.
+# Permitir la escalada de privilegios deja a un proceso ganar mas permisos que su
+# padre (p.ej. via setuid), abriendo camino a un escape del contenedor.
+# enforcementActions VACIA = modo INFORM: en produccion bancaria se observa primero.
+# Para bloquear en admision, agregar FAIL_DEPLOYMENT_CREATE/UPDATE_ENFORCEMENT y SCALE_TO_ZERO_ENFORCEMENT.
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  annotations:
+    # El CRD lo instala ACM (OperatorPolicy), no este sync: sin esto el dry-run del arranque en frio invalida la Application entera.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: no-privilege-escalation
+  namespace: stackrox
+spec:
+  policyName: Escalada de privilegios permitida
+  description: allowPrivilegeEscalation habilitado deja a un proceso ganar mas permisos que su padre y facilita un escape del contenedor; debe estar deshabilitado.
+  severity: HIGH_SEVERITY
+  categories:
+    - Security Best Practices
+  lifecycleStages:
+    - DEPLOY
+  enforcementActions: []
+  policySections:
+    - sectionName: Regla principal
+      policyGroups:
+        # "Allow Privilege Escalation" es criterio de comparacion; value "true" detecta la escalada permitida.
+        - fieldName: Allow Privilege Escalation
+          values:
+            - value: "true"

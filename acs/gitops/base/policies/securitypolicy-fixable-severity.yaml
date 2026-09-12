@@ -1,0 +1,43 @@
+# Politica de seguridad de ACS COMO CODIGO (GitOps), no por API.
+#
+# En ACS 4.11 las politicas SI tienen CRD (SecurityPolicy), reconciliado por el
+# config-controller de Central. Por eso van aqui, versionadas y sincronizadas por
+# Argo, en vez de por un playbook imperativo.
+#
+# Esta politica detecta CVEs de severidad Important o superior CON parche disponible.
+# Complementa a la de CVSS: usa la clasificacion de severidad del proveedor (mas
+# alineada al riesgo real que el numero crudo). Cubre BUILD y DEPLOY.
+# enforcementActions VACIA = modo INFORM: en produccion bancaria se observa primero.
+# Para bloquear, agregar FAIL_BUILD_ENFORCEMENT y FAIL_DEPLOYMENT_CREATE/UPDATE_ENFORCEMENT.
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  annotations:
+    # El CRD lo instala ACM (OperatorPolicy), no este sync: sin esto el dry-run del arranque en frio invalida la Application entera.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: fixable-severity
+  namespace: stackrox
+spec:
+  policyName: CVE con fix de severidad Important o superior
+  description: Una vulnerabilidad clasificada Important o superior con parche disponible debe remediarse actualizando la imagen antes de desplegar.
+  severity: HIGH_SEVERITY
+  categories:
+    - Vulnerability Management
+  lifecycleStages:
+    - BUILD
+    - DEPLOY
+  enforcementActions: []
+  policySections:
+    # "Fixable Severity" se expresa como "Fixed By" .* (hay parche) + "Severity"
+    # >= IMPORTANT. Es el patron de la built-in "Fixable Severity at least Important"
+    # de ACS 4.11 — verificado contra la consola.
+    - sectionName: Regla principal
+      policyGroups:
+        - fieldName: Fixed By
+          booleanOperator: OR
+          values:
+            - value: ".*"
+        - fieldName: Severity
+          booleanOperator: OR
+          values:
+            - value: ">= IMPORTANT"

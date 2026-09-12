@@ -1,0 +1,37 @@
+# Politica de seguridad de ACS COMO CODIGO (GitOps), no por API.
+#
+# En ACS 4.11 las politicas SI tienen CRD (SecurityPolicy), reconciliado por el
+# config-controller de Central. Por eso van aqui, versionadas y sincronizadas por
+# Argo, en vez de por un playbook imperativo.
+#
+# Politica RUNTIME: detecta procesos ejecutados con UID 0 (root) en pods vivos; un
+# proceso root en runtime rompe el minimo privilegio y agrava cualquier compromiso.
+# lifecycleStages [RUNTIME] + eventSource DEPLOYMENT_EVENT observan procesos en ejecucion.
+# enforcementActions VACIO = modo INFORM: observamos primero. En runtime el enforce seria
+# KILL_POD_ENFORCEMENT (mata el pod), accion AGRESIVA que se activa solo con criterio.
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  annotations:
+    # El CRD lo instala ACM (OperatorPolicy), no este sync: sin esto el dry-run del arranque en frio invalida la Application entera.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: process-uid-0
+  namespace: stackrox
+spec:
+  policyName: Proceso ejecutado como root (UID 0)
+  description: Un proceso corriendo con UID 0 en runtime rompe el minimo privilegio y agrava el impacto de un compromiso.
+  severity: MEDIUM_SEVERITY
+  categories:
+    - Security Best Practices
+  lifecycleStages:
+    - RUNTIME
+  eventSource: DEPLOYMENT_EVENT
+  # enforcementActions vacio a proposito: modo INFORM. En runtime el enforce seria KILL_POD_ENFORCEMENT (agresivo): activar solo con criterio.
+  enforcementActions: []
+  policySections:
+    - sectionName: Proceso con UID de root
+      policyGroups:
+        - fieldName: Process UID
+          booleanOperator: OR
+          values:
+            - value: "0"

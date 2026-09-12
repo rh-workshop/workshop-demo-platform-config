@@ -1,0 +1,40 @@
+# Politica de seguridad de ACS COMO CODIGO (GitOps), no por API.
+#
+# En ACS 4.11 las politicas SI tienen CRD (SecurityPolicy), reconciliado por el
+# config-controller de Central. Por eso van aqui, versionadas y sincronizadas por
+# Argo, en vez de por un playbook imperativo.
+#
+# Esta politica exige el label de propiedad (owner) en el deployment: sin un owner
+# declarado no se sabe a quien escalar un incidente ni quien responde por la carga.
+# Se usa "Required Label" con una regex que exige valor no vacio; ACS alerta cuando
+# NINGUN recurso del deployment lo cumple (semantica de etiqueta requerida, sin negate).
+# enforcementActions VACIO = modo INFORM: observamos primero. Para forzar en admision se
+# agregan FAIL_DEPLOYMENT_CREATE/UPDATE_ENFORCEMENT.
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  annotations:
+    # El CRD lo instala ACM (OperatorPolicy), no este sync: sin esto el dry-run del arranque en frio invalida la Application entera.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: required-label-owner
+  namespace: stackrox
+spec:
+  policyName: Falta el label de propietario (owner)
+  description: Un deployment sin label owner no permite identificar al equipo responsable ni a quien escalar un incidente.
+  severity: LOW_SEVERITY
+  categories:
+    - DevOps Best Practices
+  lifecycleStages:
+    - DEPLOY
+  # enforcementActions vacio a proposito: modo INFORM. Para enforce agregar FAIL_DEPLOYMENT_CREATE/UPDATE_ENFORCEMENT.
+  enforcementActions: []
+  policySections:
+    - sectionName: Label owner requerido
+      policyGroups:
+        # Patron de la built-in "Required Label: Owner/Team" de 4.11: formato
+        # clave=valor-regex; "owner|team=.+" exige que exista un label owner o team
+        # con valor no vacio. La semantica de "requerido" ya alerta cuando falta.
+        - fieldName: Required Label
+          booleanOperator: OR
+          values:
+            - value: "owner|team=.+"

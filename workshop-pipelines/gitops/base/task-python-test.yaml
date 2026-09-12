@@ -58,6 +58,7 @@ spec:
       workingDir: $(workspaces.source.path)/$(params.context)
       securityContext:
         allowPrivilegeEscalation: false
+        runAsNonRoot: true
         capabilities: {drop: [ALL]}
       env:
         # HOME y cachés en el filesystem efímero: el pod corre con UID aleatorio de OpenShift y no puede escribir en el HOME de la imagen.

@@ -35,6 +35,7 @@ spec:
       image: registry.redhat.io/openshift-gitops-1/argocd-rhel9:1.21
       securityContext:
         allowPrivilegeEscalation: false
+        runAsNonRoot: true
         capabilities: {drop: [ALL]}
       envFrom:
         # ARGOCD_SERVER y ARGOCD_OPTS (p. ej. --grpc-web); creado fuera de Git.
@@ -51,7 +52,8 @@ spec:
           echo "Autenticación con token de cuenta técnica (ARGOCD_AUTH_TOKEN)."
         else
           echo "AVISO: sin ARGOCD_AUTH_TOKEN; login con usuario/contraseña (migra a una cuenta técnica con token)."
-          argocd login "$ARGOCD_SERVER" --username "$ARGOCD_USERNAME" --password "$ARGOCD_PASSWORD" ${ARGOCD_OPTS:-}
+          # --password-stdin: la contraseña NO viaja como argumento de proceso (visible en /proc/<pid>/cmdline y en trazas si se activa set -x).
+          printf '%s' "$ARGOCD_PASSWORD" | argocd login "$ARGOCD_SERVER" --username "$ARGOCD_USERNAME" --password-stdin ${ARGOCD_OPTS:-}
         fi
         argocd app sync "$APP" --revision "$(params.revision)" --timeout "$(params.sync-timeout-seconds)"
         argocd app wait "$APP" --health --timeout "$(params.sync-timeout-seconds)"

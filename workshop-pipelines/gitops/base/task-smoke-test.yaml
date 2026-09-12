@@ -53,11 +53,16 @@ spec:
       image: registry.redhat.io/ubi9/ubi-minimal:9.6
       securityContext:
         allowPrivilegeEscalation: false
+        runAsNonRoot: true
         capabilities: {drop: [ALL]}
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
-        microdnf install -y --nodocs curl >/dev/null 2>&1 || true
+        # ubi-minimal trae curl-minimal en versiones recientes; si falta curl se instala,
+        # pero el fallo del install NO se silencia (un || true dejaba un error criptico en el curl posterior).
+        if ! command -v curl >/dev/null 2>&1; then
+          microdnf install -y --nodocs curl >/dev/null 2>&1
+        fi
 
         echo "Probando $(params.target-url) (se espera HTTP $(params.expected-status))"
         INTENTO=1
@@ -85,6 +90,7 @@ spec:
       image: registry.redhat.io/ubi9/ubi-minimal:9.6
       securityContext:
         allowPrivilegeEscalation: false
+        runAsNonRoot: true
         capabilities: {drop: [ALL]}
       script: |
         #!/usr/bin/env bash

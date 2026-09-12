@@ -1,0 +1,36 @@
+# Politica de seguridad de ACS COMO CODIGO (GitOps), no por API.
+#
+# En ACS 4.11 las politicas SI tienen CRD (SecurityPolicy), reconciliado por el
+# config-controller de Central. Por eso van aqui, versionadas y sincronizadas por
+# Argo, en vez de por un playbook imperativo.
+#
+# Esta politica detecta imagenes cuyo ultimo escaneo es viejo (o inexistente).
+# Un escaneo antiguo no refleja los CVEs recien publicados: la imagen puede tener
+# vulnerabilidades conocidas que ACS aun no "ve". Se exige un escaneo reciente.
+# enforcementActions VACIA = modo INFORM: en produccion bancaria se observa primero.
+# Para bloquear en admision, agregar FAIL_DEPLOYMENT_CREATE/UPDATE_ENFORCEMENT y SCALE_TO_ZERO_ENFORCEMENT.
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  annotations:
+    # El CRD lo instala ACM (OperatorPolicy), no este sync: sin esto el dry-run del arranque en frio invalida la Application entera.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: image-scanned
+  namespace: stackrox
+spec:
+  policyName: Imagen con escaneo viejo o sin escanear
+  description: Una imagen con escaneo antiguo o inexistente puede ocultar CVEs recientes; se exige un escaneo reciente antes de desplegar.
+  severity: MEDIUM_SEVERITY
+  categories:
+    - Vulnerability Management
+  lifecycleStages:
+    - DEPLOY
+  enforcementActions: []
+  policySections:
+    - sectionName: Regla principal
+      policyGroups:
+        # "Image Scan Age": antiguedad maxima del escaneo en dias. value "30" es el
+        # de la built-in "30-Day Scan Age" de 4.11 — verificado contra la consola.
+        - fieldName: Image Scan Age
+          values:
+            - value: "30"

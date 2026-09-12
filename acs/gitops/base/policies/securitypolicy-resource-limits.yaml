@@ -1,0 +1,44 @@
+# Politica de seguridad de ACS COMO CODIGO (GitOps), no por API.
+#
+# En ACS 4.11 las politicas SI tienen CRD (SecurityPolicy), reconciliado por el
+# config-controller de Central. Por eso van aqui, versionadas y sincronizadas por
+# Argo, en vez de por un playbook imperativo.
+#
+# Esta politica detecta contenedores SIN limite de CPU o de memoria: sin limites un
+# pod puede consumir todo el nodo y provocar contencion o desalojo de vecinos.
+# enforcementActions VACIO = modo INFORM: en produccion bancaria observamos primero
+# el volumen de alertas antes de bloquear. Para forzar (enforce) se agregan aqui las
+# acciones FAIL_DEPLOYMENT_CREATE/UPDATE_ENFORCEMENT.
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  annotations:
+    # El CRD lo instala ACM (OperatorPolicy), no este sync: sin esto el dry-run del arranque en frio invalida la Application entera.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: resource-limits
+  namespace: stackrox
+spec:
+  policyName: Contenedor sin limites de CPU o memoria
+  description: Un contenedor sin limite de CPU o memoria puede agotar los recursos del nodo y afectar a otras cargas.
+  severity: LOW_SEVERITY
+  categories:
+    - Docker CIS
+    - DevOps Best Practices
+  lifecycleStages:
+    - DEPLOY
+  # enforcementActions vacio a proposito: modo INFORM. Para enforce agregar FAIL_DEPLOYMENT_CREATE/UPDATE_ENFORCEMENT.
+  enforcementActions: []
+  policySections:
+    # Patron de la built-in "No CPU request or memory limit specified" de 4.11:
+    # "Container CPU Request" y "Container Memory Limit" con value "0.000000"
+    # (0 = no definido). No existe "Container CPU Limit" como fieldName en 4.11.
+    - sectionName: Sin request de CPU ni limite de memoria
+      policyGroups:
+        - fieldName: Container CPU Request
+          booleanOperator: OR
+          values:
+            - value: "0.000000"
+        - fieldName: Container Memory Limit
+          booleanOperator: OR
+          values:
+            - value: "0.000000"

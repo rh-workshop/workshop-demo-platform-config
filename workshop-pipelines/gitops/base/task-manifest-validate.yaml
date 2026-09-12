@@ -47,10 +47,22 @@ spec:
   workspaces:
     - name: source
       description: Copia de trabajo del repositorio.
+  # Cotas de recursos y securityContext, igual que las tasks hermanas: la
+  # documentacion de Tekton las exige en cada step; sin limite un run puede
+  # agotar la memoria del nodo, y en un namespace con LimitRange el pod no
+  # arranca si no las declara.
+  stepTemplate:
+    computeResources:
+      requests: {cpu: 250m, memory: 512Mi}
+      limits: {cpu: "1", memory: 2Gi}
+    securityContext:
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      capabilities: {drop: [ALL]}
   steps:
     # ---------------------------------------------------------------- 1. render
     - name: render
-      image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+      image: registry.redhat.io/openshift4/ose-cli-rhel9:v4.20
       workingDir: $(workspaces.source.path)
       script: |
         #!/usr/bin/env bash
@@ -73,7 +85,7 @@ spec:
 
     # ------------------------------------------------- 2. el apiserver lo acepta
     - name: dry-run
-      image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+      image: registry.redhat.io/openshift4/ose-cli-rhel9:v4.20
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
@@ -101,7 +113,7 @@ spec:
 
     # -------------------------------------------------------- 3. sin marcadores
     - name: placeholders
-      image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+      image: registry.redhat.io/openshift4/ose-cli-rhel9:v4.20
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
@@ -127,7 +139,7 @@ spec:
 
     # ----------------------------------------------- 4. kinds dentro del proyecto
     - name: appproject-fit
-      image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+      image: registry.redhat.io/openshift4/ose-cli-rhel9:v4.20
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
@@ -158,7 +170,7 @@ spec:
 
     # --------------------------------------------------------- 5. RBAC sin comodin
     - name: rbac
-      image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+      image: registry.redhat.io/openshift4/ose-cli-rhel9:v4.20
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
@@ -189,7 +201,7 @@ spec:
 
     # ------------------------------------------------ 6. un objeto, un solo dueno
     - name: single-owner
-      image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+      image: registry.redhat.io/openshift4/ose-cli-rhel9:v4.20
       script: |
         #!/usr/bin/env bash
         set -euo pipefail

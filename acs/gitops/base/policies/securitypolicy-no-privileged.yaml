@@ -1,0 +1,35 @@
+# Politica de seguridad de ACS COMO CODIGO (GitOps), no por API.
+#
+# En ACS 4.11 las politicas SI tienen CRD (SecurityPolicy), reconciliado por el
+# config-controller de Central. Por eso van aqui, versionadas y sincronizadas por
+# Argo, en vez de por un playbook imperativo.
+#
+# Esta politica detecta contenedores en modo PRIVILEGIADO (privileged: true).
+# Un contenedor privilegiado tiene acceso casi total al host (dispositivos, kernel),
+# rompiendo el aislamiento; es de los hallazgos mas graves en una plataforma bancaria.
+# enforcementActions VACIA = modo INFORM: en produccion bancaria se observa primero.
+# Para bloquear en admision, agregar FAIL_DEPLOYMENT_CREATE/UPDATE_ENFORCEMENT y SCALE_TO_ZERO_ENFORCEMENT.
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  annotations:
+    # El CRD lo instala ACM (OperatorPolicy), no este sync: sin esto el dry-run del arranque en frio invalida la Application entera.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: no-privileged
+  namespace: stackrox
+spec:
+  policyName: Contenedor privilegiado
+  description: Un contenedor privilegiado accede casi por completo al host y rompe el aislamiento; nunca debe usarse en cargas de negocio.
+  severity: CRITICAL_SEVERITY
+  categories:
+    - Security Best Practices
+  lifecycleStages:
+    - DEPLOY
+  enforcementActions: []
+  policySections:
+    - sectionName: Regla principal
+      policyGroups:
+        # "Privileged Container" es criterio de comparacion; value "true" detecta el modo privilegiado.
+        - fieldName: Privileged Container
+          values:
+            - value: "true"
