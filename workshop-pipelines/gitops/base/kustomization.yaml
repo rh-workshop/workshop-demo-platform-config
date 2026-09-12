@@ -22,6 +22,12 @@ resources:
   - task-manifest-validate.yaml
   - task-image-scan.yaml
   - task-sbom-generate.yaml
+  # Agente IA de triage de CVE (propone, no decide): lee el escaneo, prioriza por
+  # explotabilidad y escribe un triage.md. Aislamiento out-of-process: la
+  # NetworkPolicy corta egress salvo Central+modelo; correr el TaskRun con
+  # runtimeClassName kata (sandboxed containers). Ver docs/ai-agents-devsecops-design.md.
+  - task-agent-cve-triage.yaml
+  - networkpolicy-agent-cve-triage.yaml
   # Comprueba que lo desplegado RESPONDE: Healthy en Argo no implica alcanzable.
   - task-smoke-test.yaml
   - task-argocd-sync.yaml
