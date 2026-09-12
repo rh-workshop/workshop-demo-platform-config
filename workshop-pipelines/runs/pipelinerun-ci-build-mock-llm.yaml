@@ -1,0 +1,81 @@
+# Run on the hub in the existing pipeline namespace. Uses existing signing and ACS integrations.
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  namespace: workshop-demo-dev
+  generateName: ci-build-mock-llm-
+  labels:
+    app.kubernetes.io/part-of: workshop-gitops
+spec:
+  pipelineRef:
+    name: ci-build-image
+  # Identidad con permiso para publicar en el registro de imágenes.
+  taskRunTemplate:
+    serviceAccountName: builder
+  # Cota explícita: si el run se cuelga (registro caído, push bloqueado) no queda corriendo para siempre.
+  timeouts:
+    pipeline: 1h0m0s
+  params:
+    - name: config-push-mode
+      value: pr
+    - name: revision
+      value: f2c8bfd2003310d0b067c545c9430139972e84c5
+    # Repositorio SIN tag en el registro corporativo (Quay, la variable quay_host del bootstrap): el tag git-<sha> lo pone el pipeline.
+    - name: image-repository
+      value: company-quay-quay-quay-enterprise.apps.ocp.hq2ss.sandbox3270.opentlc.com/company-dev/mock-llm
+    # Umbral del escaneo como PARÁMETRO: CRITICAL corta solo lo crítico; súbelo a IMPORTANT para endurecer la puerta.
+    - name: scan-severity-threshold
+      value: CRITICAL
+    # Elige el binario del monorepo: el Containerfile construye ./cmd/api-service.
+    - name: language
+      value: python
+    - name: test-context
+      value: mock-llm
+    - name: containerfile
+      value: ./mock-llm/Containerfile
+    - name: fail-on-no-tests
+      value: "true"
+    # El digest se escribe en el overlay de la API y sobre su nombre lógico de imagen.
+    - name: overlay-path
+      value: apps/mock-llm/overlays/dev
+    - name: image-name
+      value: mock-llm
+  workspaces:
+    # Solución canónica de Tekton para compartir un PVC RWO entre tareas: el asistente de afinidad (activo por defecto) las coprograma en el mismo nodo.
+    - name: source
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          # Sin storageClassName se usa la StorageClass por defecto del cluster (debe ser RWO).
+          resources:
+            requests:
+              storage: 1Gi
+    - name: config
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          # Sin storageClassName se usa la StorageClass por defecto del cluster (debe ser RWO).
+          resources:
+            requests:
+              storage: 1Gi
+    - name: git-credentials
+      # Secret basic-auth con permiso de push al repo de configuración. Se crea
+      # aparte (nunca se versiona) y se referencia aquí por su nombre.
+      secret:
+        secretName: git-credentials
+    - name: registry-credentials
+      # Secret con la credencial del robot del registro, creado FUERA de Git:
+      #   oc create secret generic quay-push-credentials --from-file=config.json=<docker config del robot>
+      secret:
+        secretName: quay-push-credentials
+    - name: signing-key
+      # Llavero cosign generado FUERA de Git: cosign generate-key-pair k8s://<ns>/cosign-signing-key
+      secret:
+        secretName: cosign-signing-key
+    - name: acs-credentials
+      # Token de Central (rol Continuous Integration) + CA, creado FUERA de Git:
+      #   oc create secret generic acs-pipeline-credentials --from-literal=rox-api-token=<token> --from-file=ca.pem=<CA>
+      secret:
+        secretName: acs-pipeline-credentials
